@@ -8,7 +8,7 @@
   /* ============================================================
      CONFIG — must match the value in index.html
      ============================================================ */
-  const SHEET_WEBHOOK_URL = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE"; // ends in /exec
+  const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwbsmfOpMcKAv4FMsuDupCPBmzg4OO4YZMFbCmllBE1C9r7bcEYW7GY_pr6rFUFgf5n1A/exec"; // ends in /exec
   const POLL_MS = 4000;
   const QUESTION_LABELS = [
     "Q1 · Hobby", "Q2 · Nerd out", "Q3 · Hidden skill", "Q4 · Curious", "Q5 · Next trip",
@@ -35,21 +35,27 @@
     background: #0A1A33; color: #E8ECF4;
     font-family: 'IBM Plex Mono', monospace;
   }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 40px; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 24px 20px 40px; }
   h1 {
     font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700;
     margin: 0 0 4px;
   }
+  h2 {
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700;
+    margin: 0 0 10px;
+  }
   .status { font-size: 12.5px; color: #8891A7; margin: 0 0 18px; }
   .status.live { color: #3B82D8; }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: #8891A7; margin: 0 0 10px; }
+  .style-row { display: flex; align-items: center; gap: 16px; font-size: 12.5px; color: #8891A7; margin: 0 0 18px; }
+  .panels { display: flex; gap: 20px; flex-wrap: wrap; }
+  .panel { flex: 1 1 480px; min-width: 380px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #8891A7; margin: 0 0 8px; min-height: 18px; }
   .legend span { display: flex; align-items: center; gap: 5px; }
   .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-  .style-row { display: flex; align-items: center; gap: 16px; font-size: 12.5px; color: #8891A7; margin: 0 0 14px; }
   svg { width: 100%; height: auto; background: #122845; border: 1px solid #1E3A5F; border-radius: 14px; }
-  .empty { color: #5B6478; font-size: 13px; padding: 40px 0; text-align: center; }
-  .feed-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin: 24px 0 10px; }
-  .feed { display: flex; flex-direction: column-reverse; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .empty { color: #5B6478; font-size: 13px; padding: 30px 0; text-align: center; }
+  .feed-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin: 28px 0 10px; }
+  .feed { display: flex; flex-direction: column-reverse; gap: 6px; max-height: 300px; overflow-y: auto; }
   .feed-item {
     font-size: 13px; color: #E8ECF4; background: #122845; border: 1px solid #1E3A5F;
     border-radius: 6px; padding: 8px 12px;
@@ -61,7 +67,6 @@
 <div class="wrap">
   <h1>Live connections</h1>
   <p class="status" id="status">Connecting…</p>
-  <div class="legend" id="legend"></div>
   <div class="style-row">
     <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:2px;background:#5B6478;display:inline-block"></span>same answer</span>
     <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:0;border-top:2px dashed #5B6478;display:inline-block"></span>shared keyword only</span>
@@ -70,8 +75,22 @@
       Show loose matches
     </label>
   </div>
-  <svg id="graph" viewBox="0 0 900 600"></svg>
-  <p class="empty" id="empty" style="display:none">No responses yet — answers will appear here as people submit.</p>
+
+  <div class="panels">
+    <div class="panel">
+      <h2>Interests</h2>
+      <div class="legend" id="legend-interests"></div>
+      <svg id="graph-interests" viewBox="0 0 640 520"></svg>
+      <p class="empty" id="empty-interests" style="display:none">No responses yet.</p>
+    </div>
+    <div class="panel">
+      <h2>Debates</h2>
+      <div class="legend" id="legend-debates"></div>
+      <svg id="graph-debates" viewBox="0 0 640 520"></svg>
+      <p class="empty" id="empty-debates" style="display:none">No responses yet.</p>
+    </div>
+  </div>
+
   <div class="feed-title">Response feed</div>
   <div class="feed" id="feed"></div>
 </div>
@@ -82,6 +101,11 @@
   const OTHER = "#5B6478";
   const STOPWORDS = new Set(["the","a","an","and","of","to","in","on","with","your","you","can","do","my","every","for"]);
   let jsonpCounter = 0;
+
+  const GROUPS = {
+    interests: { questions: QUESTION_LABELS.slice(0, 5), svg: "graph-interests", legend: "legend-interests", empty: "empty-interests", sim: null },
+    debates: { questions: QUESTION_LABELS.slice(5), svg: "graph-debates", legend: "legend-debates", empty: "empty-debates", sim: null },
+  };
 
   function fetchJsonp() {
     return new Promise((resolve, reject) => {
@@ -116,25 +140,20 @@
     }).join("");
   }
 
-  let sim = null;
-
-  function render(rows) {
-    const byPerson = {};
-    rows.forEach((r) => {
-      byPerson[r.name] = byPerson[r.name] || {};
-      byPerson[r.name][r.question] = r.answer;
-    });
-    const names = Object.keys(byPerson);
-    document.getElementById("empty").style.display = names.length ? "none" : "block";
-    renderFeed(rows);
+  function renderGroup(byPerson, groupKey) {
+    const g = GROUPS[groupKey];
+    const questions = g.questions;
+    const names = Object.keys(byPerson).filter((n) => questions.some((q) => byPerson[n][q]));
+    document.getElementById(g.empty).style.display = names.length ? "none" : "block";
     if (!names.length) {
-      d3.select("#graph").selectAll("*").remove();
+      d3.select("#" + g.svg).selectAll("*").remove();
+      document.getElementById(g.legend).innerHTML = "";
       return;
     }
 
     const nodes = names.map((n) => ({ id: n }));
     const strong = [];
-    QUESTION_LABELS.forEach((q) => {
+    questions.forEach((q) => {
       const groups = {};
       names.forEach((n) => {
         const raw = byPerson[n][q];
@@ -142,20 +161,20 @@
         const key = normalize(raw);
         (groups[key] = groups[key] || { label: raw, members: [] }).members.push(n);
       });
-      Object.values(groups).forEach((g) => {
-        if (g.members.length > 1) {
-          for (let i = 0; i < g.members.length; i++)
-            for (let j = i + 1; j < g.members.length; j++)
-              strong.push({ source: g.members[i], target: g.members[j], label: g.label });
+      Object.values(groups).forEach((grp) => {
+        if (grp.members.length > 1) {
+          for (let i = 0; i < grp.members.length; i++)
+            for (let j = i + 1; j < grp.members.length; j++)
+              strong.push({ source: grp.members[i], target: grp.members[j], label: grp.label });
         }
       });
     });
 
-    // loose matches: shared significant words across different answers,
-    // excluding anything already captured as a strong (exact-answer) match
     const wordIndex = {};
     names.forEach((n) => {
-      Object.values(byPerson[n]).forEach((raw) => {
+      questions.forEach((q) => {
+        const raw = byPerson[n][q];
+        if (!raw) return;
         normalize(raw).split(" ").forEach((w) => {
           if (w.length >= 5 && !STOPWORDS.has(w)) (wordIndex[w] = wordIndex[w] || new Set()).add(n);
         });
@@ -175,7 +194,6 @@
         }
     });
 
-    // rank clusters by size, biggest gets color 1
     const clusterSize = {};
     strong.forEach((e) => { clusterSize[e.label] = (clusterSize[e.label] || 0) + 1; });
     const rankedTopics = Object.entries(clusterSize).sort((a, b) => b[1] - a[1]).map(([t]) => t);
@@ -199,7 +217,7 @@
       return { type: "solid", color: memberships[0].color };
     }
 
-    document.getElementById("legend").innerHTML = rankedTopics.slice(0, CLUSTER_COLORS.length).map((t, i) =>
+    document.getElementById(g.legend).innerHTML = rankedTopics.slice(0, CLUSTER_COLORS.length).map((t, i) =>
       `<span><span class="dot" style="background:${CLUSTER_COLORS[i]}"></span>${t}</span>`
     ).join("") + (rankedTopics.length > CLUSTER_COLORS.length
       ? `<span><span class="dot" style="background:${OTHER}"></span>other matches</span>` : "");
@@ -207,10 +225,10 @@
     const degree = {};
     strong.forEach((e) => { degree[e.source] = (degree[e.source] || 0) + 1; degree[e.target] = (degree[e.target] || 0) + 1; });
 
-    const svg = d3.select("#graph");
+    const svg = d3.select("#" + g.svg);
     svg.selectAll("*").remove();
     const defs = svg.append("defs");
-    const W = 900, H = 600;
+    const W = 640, H = 520;
 
     const link = svg.append("g").selectAll("line").data(strong).join("line")
       .attr("stroke", (d) => d.color).attr("stroke-width", 2).attr("opacity", 0.75);
@@ -224,30 +242,30 @@
 
     const node = svg.append("g").selectAll("g").data(nodes).join("g");
     node.append("circle")
-      .attr("r", (d) => 8 + Math.min(degree[d.id] || 0, 6) * 1.8)
+      .attr("r", (d) => 7 + Math.min(degree[d.id] || 0, 6) * 1.5)
       .attr("fill", (d) => {
         const fill = nodeFill(d.id);
         if (fill.type === "solid") return fill.color;
-        const pid = "stripe-" + d.id.replace(/[^a-z0-9]/gi, "");
+        const pid = "stripe-" + groupKey + "-" + d.id.replace(/[^a-z0-9]/gi, "");
         defs.append("pattern").attr("id", pid).attr("width", 8).attr("height", 8)
           .attr("patternUnits", "userSpaceOnUse").attr("patternTransform", "rotate(45)")
           .html(`<rect width="8" height="8" fill="${fill.colorA}"/><rect width="4" height="8" fill="${fill.colorB}"/>`);
         return `url(#${pid})`;
       })
       .attr("stroke", "#122845").attr("stroke-width", 1.5);
-    node.append("text").attr("text-anchor", "middle").attr("dy", -15)
-      .attr("fill", "#8891A7").attr("font-size", "12px").attr("font-family", "IBM Plex Mono, monospace")
+    node.append("text").attr("text-anchor", "middle").attr("dy", -13)
+      .attr("fill", "#8891A7").attr("font-size", "11px").attr("font-family", "IBM Plex Mono, monospace")
       .text((d) => d.id);
     node.append("title").text((d) => d.id);
 
-    if (sim) sim.stop();
-    sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink([...strong, ...weak]).id((d) => d.id).distance((d) => strong.includes(d) ? 80 : 140).strength(0.4))
-      .force("charge", d3.forceManyBody().strength(-260))
+    if (g.sim) g.sim.stop();
+    g.sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink([...strong, ...weak]).id((d) => d.id).distance((d) => strong.includes(d) ? 65 : 110).strength(0.4))
+      .force("charge", d3.forceManyBody().strength(-200))
       .force("center", d3.forceCenter(W / 2, H / 2))
-      .force("collide", d3.forceCollide(34));
+      .force("collide", d3.forceCollide(28));
 
-    sim.on("tick", () => {
+    g.sim.on("tick", () => {
       link.attr("x1", (d) => d.source.x).attr("y1", (d) => d.source.y)
           .attr("x2", (d) => d.target.x).attr("y2", (d) => d.target.y);
       weakLink.attr("x1", (d) => d.source.x).attr("y1", (d) => d.source.y)
@@ -256,10 +274,23 @@
     });
   }
 
+  function render(rows) {
+    const byPerson = {};
+    rows.forEach((r) => {
+      byPerson[r.name] = byPerson[r.name] || {};
+      byPerson[r.name][r.question] = r.answer;
+    });
+    renderFeed(rows);
+    renderGroup(byPerson, "interests");
+    renderGroup(byPerson, "debates");
+  }
+
   document.getElementById("weak-toggle").addEventListener("change", (e) => {
-    d3.select("#graph").selectAll("g").each(function () {
-      const g = d3.select(this);
-      if (g.selectAll("line[stroke-dasharray]").size() > 0) g.style("display", e.target.checked ? null : "none");
+    ["graph-interests", "graph-debates"].forEach((svgId) => {
+      d3.select("#" + svgId).selectAll("g").each(function () {
+        const g = d3.select(this);
+        if (g.selectAll("line[stroke-dasharray]").size() > 0) g.style("display", e.target.checked ? null : "none");
+      });
     });
   });
 
