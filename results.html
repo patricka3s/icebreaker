@@ -10,7 +10,22 @@
      ============================================================ */
   const SHEET_WEBHOOK_URL = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE"; // ends in /exec
   const POLL_MS = 4000;
-  const QUESTION_LABELS = ["Q1 · Hobby", "Q2 · Nerd out", "Q3 · Hidden skill", "Q4 · Curious", "Q5 · Next trip"];
+  const QUESTION_LABELS = [
+    "Q1 · Hobby", "Q2 · Nerd out", "Q3 · Hidden skill", "Q4 · Curious", "Q5 · Next trip",
+    "Q6 · Hot dog debate", "Q7 · Cereal debate", "Q8 · Pizza debate", "Q9 · TP debate", "Q10 · Duck debate"
+  ];
+  const FEED_TEMPLATES = {
+    "Q1 · Hobby": (n, a) => `${n}'s hobby: ${a}.`,
+    "Q2 · Nerd out": (n, a) => `${n} wants to nerd out about ${a}.`,
+    "Q3 · Hidden skill": (n, a) => `${n}'s hidden skill: ${a}.`,
+    "Q4 · Curious": (n, a) => `${n} is curious about ${a}.`,
+    "Q5 · Next trip": (n, a) => `${n} wants to travel to ${a}.`,
+    "Q6 · Hot dog debate": (n, a) => `${n} thinks a hot dog is ${a === "A sandwich" ? "a sandwich" : "not a sandwich"}.`,
+    "Q7 · Cereal debate": (n, a) => `${n} ${a.startsWith("Yes") ? "thinks cereal is soup" : "says cereal is not soup"}.`,
+    "Q8 · Pizza debate": (n, a) => `${n} thinks pineapple on pizza is ${a.toLowerCase()}.`,
+    "Q9 · TP debate": (n, a) => `${n} is team ${a.toLowerCase()}.`,
+    "Q10 · Duck debate": (n, a) => `${n} would fight ${a}.`,
+  };
 </script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -33,6 +48,13 @@
   .style-row { display: flex; align-items: center; gap: 16px; font-size: 12.5px; color: #8891A7; margin: 0 0 14px; }
   svg { width: 100%; height: auto; background: #122845; border: 1px solid #1E3A5F; border-radius: 14px; }
   .empty { color: #5B6478; font-size: 13px; padding: 40px 0; text-align: center; }
+  .feed-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin: 24px 0 10px; }
+  .feed { display: flex; flex-direction: column-reverse; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .feed-item {
+    font-size: 13px; color: #E8ECF4; background: #122845; border: 1px solid #1E3A5F;
+    border-radius: 6px; padding: 8px 12px;
+  }
+  .feed-item .name { color: #3B82D8; font-weight: 500; }
 </style>
 </head>
 <body>
@@ -50,6 +72,8 @@
   </div>
   <svg id="graph" viewBox="0 0 900 600"></svg>
   <p class="empty" id="empty" style="display:none">No responses yet — answers will appear here as people submit.</p>
+  <div class="feed-title">Response feed</div>
+  <div class="feed" id="feed"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
@@ -78,6 +102,20 @@
     return (s || "").toLowerCase().trim().replace(/[.!?,'"]+$/g, "").replace(/\s+/g, " ");
   }
 
+  function escapeHtml(s) {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  function renderFeed(rows) {
+    const feedEl = document.getElementById("feed");
+    feedEl.innerHTML = rows.map((r) => {
+      const tmpl = FEED_TEMPLATES[r.question];
+      const sentence = tmpl ? tmpl(r.name, r.answer) : `${r.name}: ${r.answer}`;
+      const rest = sentence.startsWith(r.name) ? sentence.slice(r.name.length) : ` ${sentence}`;
+      return `<div class="feed-item"><span class="name">${escapeHtml(r.name)}</span>${escapeHtml(rest)}</div>`;
+    }).join("");
+  }
+
   let sim = null;
 
   function render(rows) {
@@ -88,6 +126,7 @@
     });
     const names = Object.keys(byPerson);
     document.getElementById("empty").style.display = names.length ? "none" : "block";
+    renderFeed(rows);
     if (!names.length) {
       d3.select("#graph").selectAll("*").remove();
       return;

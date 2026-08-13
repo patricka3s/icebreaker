@@ -10,7 +10,7 @@
      ============================================================ */
   const SHEET_WEBHOOK_URL = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE"; // ends in /exec
   const SHEET_VIEW_URL = "PASTE_YOUR_GOOGLE_SHEET_LINK_HERE";       // for the end screen
-  const QUESTION_SECONDS = 25; // seconds per question
+  const QUESTION_SECONDS = 20; // seconds per question
 </script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -72,6 +72,13 @@
   }
   .sheet-link { color: #3B82D8; font-size: 12.5px; text-decoration: underline; }
   .hidden { display: none !important; }
+  .choice-row { display: flex; flex-direction: column; gap: 10px; }
+  .choice-btn {
+    background: transparent; color: #E8ECF4; border: 1px solid #274B78; border-radius: 8px;
+    padding: 14px 16px; font-weight: 500; font-size: 15px; font-family: inherit; cursor: pointer;
+  }
+  .choice-btn:disabled { opacity: 0.45; cursor: default; }
+  .choice-btn.selected { border-color: #3B82D8; background: rgba(59,130,216,0.12); color: #3B82D8; }
 </style>
 </head>
 <body>
@@ -82,7 +89,7 @@
     <div id="screen-start">
       <div class="eyebrow">SPEED MATCH</div>
       <h1>Rapid-fire icebreaker</h1>
-      <p class="sub">5 questions, ~40 seconds each. Type your first name, then answer as each prompt appears.</p>
+      <p class="sub">10 questions, 20 seconds each — half get-to-know-you, half ridiculous debates. Type your first name, then answer as each prompt appears.</p>
       <input type="text" id="name-input" placeholder="Your name" autofocus />
       <button class="btn" id="btn-start" disabled>Everyone ready — Start</button>
       <p class="footnote">Tap start at the same moment as your group for a synced countdown.</p>
@@ -91,7 +98,7 @@
     <!-- QUESTION SCREEN -->
     <div id="screen-question" class="hidden">
       <div class="eyebrow-row">
-        <span id="q-index">QUESTION 1 / 5</span>
+        <span id="q-index">QUESTION 1 / 10</span>
         <span id="q-label"></span>
       </div>
       <div class="timer-ring">
@@ -100,11 +107,12 @@
           <circle id="ring-progress" cx="55" cy="55" r="48" stroke="#3B82D8" stroke-width="7" fill="none"
             stroke-linecap="round" stroke-dasharray="301.6" stroke-dashoffset="0"/>
         </svg>
-        <div class="timer-num" id="timer-num">40</div>
+        <div class="timer-num" id="timer-num">20</div>
       </div>
       <h1 id="q-prompt"></h1>
       <input type="text" id="answer-input" placeholder="Type your answer…" />
       <button class="btn" id="btn-submit">Submit</button>
+      <div class="choice-row hidden" id="choice-buttons"></div>
       <div class="status-line" id="status-line"></div>
       <div class="progress-dots" id="dots"></div>
     </div>
@@ -112,7 +120,7 @@
     <!-- END SCREEN -->
     <div id="screen-end" class="hidden">
       <div class="eyebrow">TIME'S UP</div>
-      <h1>That's all 5.</h1>
+      <h1>That's all 10.</h1>
       <p class="sub">Answers are already in the sheet. Duplicate answers in the same column are your "should connect" pairs.</p>
       <a class="sheet-link" id="link-end" target="_blank" rel="noopener">Open the responses sheet</a>
       <a class="sheet-link" href="results.html" target="_blank" rel="noopener">View live connections graph</a>
@@ -124,11 +132,16 @@
 
 <script>
   const QUESTIONS = [
-    { label: "Q1 · Hobby",        prompt: "Name a hobby you have outside of work." },
-    { label: "Q2 · Nerd out",     prompt: "Name a topic you'd love to nerd out about but rarely get to." },
-    { label: "Q3 · Hidden skill", prompt: "Name a skill you have that nobody on this team knows about." },
-    { label: "Q4 · Curious",      prompt: "Name something you're currently curious about or trying to learn." },
-    { label: "Q5 · Next trip",    prompt: "Name a place you'd want to travel to next." },
+    { label: "Q1 · Hobby",        type: "text", prompt: "Name a hobby you have outside of work." },
+    { label: "Q2 · Nerd out",     type: "text", prompt: "Name a topic you'd love to nerd out about but rarely get to." },
+    { label: "Q3 · Hidden skill", type: "text", prompt: "Name a skill you have that nobody on this team knows about." },
+    { label: "Q4 · Curious",      type: "text", prompt: "Name something you're currently curious about or trying to learn." },
+    { label: "Q5 · Next trip",    type: "text", prompt: "Name a place you'd want to travel to next." },
+    { label: "Q6 · Hot dog debate",  type: "choice", prompt: "Is a hot dog a sandwich?", options: ["A sandwich", "Not a sandwich"] },
+    { label: "Q7 · Cereal debate",   type: "choice", prompt: "Is cereal a soup?", options: ["Yes, it's soup", "No way"] },
+    { label: "Q8 · Pizza debate",    type: "choice", prompt: "Pineapple on pizza?", options: ["Delicious", "Disgusting"] },
+    { label: "Q9 · TP debate",       type: "choice", prompt: "Toilet paper: over or under?", options: ["Over", "Under"] },
+    { label: "Q10 · Duck debate",    type: "choice", prompt: "Fight one horse-sized duck, or 100 duck-sized horses?", options: ["1 horse-sized duck", "100 duck-sized horses"] },
   ];
 
   const CIRCUMFERENCE = 2 * Math.PI * 48; // matches r=48 in the SVG ring
@@ -178,15 +191,43 @@
     submittedThisQuestion = false;
 
     const answerInput = document.getElementById("answer-input");
+    const submitBtn = document.getElementById("btn-submit");
+    const choiceRow = document.getElementById("choice-buttons");
     const statusLine = document.getElementById("status-line");
-    answerInput.value = "";
-    answerInput.disabled = false;
-    document.getElementById("btn-submit").disabled = false;
+    const q = QUESTIONS[index];
     statusLine.textContent = "";
     document.getElementById("q-index").textContent = `QUESTION ${index + 1} / ${QUESTIONS.length}`;
-    document.getElementById("q-label").textContent = QUESTIONS[index].label;
-    document.getElementById("q-prompt").textContent = QUESTIONS[index].prompt;
-    answerInput.focus();
+    document.getElementById("q-label").textContent = q.label;
+    document.getElementById("q-prompt").textContent = q.prompt;
+
+    if (q.type === "choice") {
+      answerInput.classList.add("hidden");
+      submitBtn.classList.add("hidden");
+      choiceRow.classList.remove("hidden");
+      choiceRow.innerHTML = "";
+      q.options.forEach((opt) => {
+        const b = document.createElement("button");
+        b.className = "choice-btn";
+        b.textContent = opt;
+        b.addEventListener("click", () => {
+          if (submittedThisQuestion) return;
+          submitAnswer(q.label, opt);
+          submittedThisQuestion = true;
+          b.classList.add("selected");
+          choiceRow.querySelectorAll(".choice-btn").forEach((el) => (el.disabled = true));
+          statusLine.textContent = "Locked in — waiting for time to run out.";
+        });
+        choiceRow.appendChild(b);
+      });
+    } else {
+      choiceRow.classList.add("hidden");
+      answerInput.classList.remove("hidden");
+      submitBtn.classList.remove("hidden");
+      answerInput.value = "";
+      answerInput.disabled = false;
+      submitBtn.disabled = false;
+      answerInput.focus();
+    }
 
     let secondsLeft = QUESTION_SECONDS;
     const ring = document.getElementById("ring-progress");
