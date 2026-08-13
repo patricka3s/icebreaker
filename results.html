@@ -8,7 +8,7 @@
   /* ============================================================
      CONFIG — must match the value in index.html
      ============================================================ */
-  const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwbsmfOpMcKAv4FMsuDupCPBmzg4OO4YZMFbCmllBE1C9r7bcEYW7GY_pr6rFUFgf5n1A/exec"; // ends in /exec
+  const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwbsmfOpMcKAv4FMsuDupCPBmzg4OO4YZMFbCmllBE1C9r7bcEYW7GY_pr6rFUFgf5n1A/exec";
   const POLL_MS = 4000;
   const QUESTION_LABELS = [
     "Q1 · Hobby", "Q2 · Nerd out", "Q3 · Hidden skill", "Q4 · Curious", "Q5 · Next trip",
@@ -55,7 +55,7 @@
   svg { width: 100%; height: auto; background: #122845; border: 1px solid #1E3A5F; border-radius: 14px; }
   .empty { color: #5B6478; font-size: 13px; padding: 30px 0; text-align: center; }
   .feed-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin: 28px 0 10px; }
-  .feed { display: flex; flex-direction: column-reverse; gap: 6px; max-height: 300px; overflow-y: auto; }
+  .feed { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; scroll-behavior: smooth; }
   .feed-item {
     font-size: 13px; color: #E8ECF4; background: #122845; border: 1px solid #1E3A5F;
     border-radius: 6px; padding: 8px 12px;
@@ -132,12 +132,13 @@
 
   function renderFeed(rows) {
     const feedEl = document.getElementById("feed");
-    feedEl.innerHTML = rows.map((r) => {
+    feedEl.innerHTML = rows.slice().reverse().map((r) => {
       const tmpl = FEED_TEMPLATES[r.question];
       const sentence = tmpl ? tmpl(r.name, r.answer) : `${r.name}: ${r.answer}`;
       const rest = sentence.startsWith(r.name) ? sentence.slice(r.name.length) : ` ${sentence}`;
       return `<div class="feed-item"><span class="name">${escapeHtml(r.name)}</span>${escapeHtml(rest)}</div>`;
     }).join("");
+    feedEl.scrollTop = 0;
   }
 
   function renderGroup(byPerson, groupKey) {
