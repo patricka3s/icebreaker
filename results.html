@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Speed Match — live connections</title>
+<title>Icebreaker — live connections</title>
 <script>
   /* ============================================================
      CONFIG — must match the value in index.html
@@ -12,7 +12,10 @@
   const POLL_MS = 4000;
   const QUESTION_LABELS = [
     "Q1 · Hobby", "Q2 · Nerd out", "Q3 · Hidden skill", "Q4 · Curious", "Q5 · Next trip",
-    "Q6 · Hot dog debate", "Q7 · Cereal debate", "Q8 · Football debate", "Q9 · TP debate", "Q10 · Ice debate"
+    "Q6 · Ketchup on eggs", "Q7 · Brownie debate", "Q8 · Cold spaghetti", "Q9 · Friends debate",
+    "Q10 · AI thank-you notes", "Q11 · Stranger Things", "Q12 · Laundry debate", "Q13 · Tea debate",
+    "Q14 · Comic Sans", "Q15 · Cat or dog", "Q16 · Clown or goat", "Q17 · Rhymes or riddles",
+    "Q18 · Pancakes or pudding", "Q19 · Burp or fart", "Q20 · Noodle hair"
   ];
   const FEED_TEMPLATES = {
     "Q1 · Hobby": (n, a) => `${n}'s hobby: ${a}.`,
@@ -20,11 +23,21 @@
     "Q3 · Hidden skill": (n, a) => `${n}'s hidden skill: ${a}.`,
     "Q4 · Curious": (n, a) => `${n} is curious about ${a}.`,
     "Q5 · Next trip": (n, a) => `${n} wants to travel to ${a}.`,
-    "Q6 · Hot dog debate": (n, a) => `${n} thinks a hot dog is ${a === "A sandwich" ? "a sandwich" : "not a sandwich"}.`,
-    "Q7 · Cereal debate": (n, a) => `${n} ${a.startsWith("Yes") ? "thinks cereal is soup" : "says cereal is not soup"}.`,
-    "Q8 · Football debate": (n, a) => `${n} calls it ${a.toLowerCase()}.`,
-    "Q9 · TP debate": (n, a) => `${n} is team ${a.toLowerCase()}.`,
-    "Q10 · Ice debate": (n, a) => `${n} wants ${a.toLowerCase()} in their drink.`,
+    "Q6 · Ketchup on eggs": (n, a) => a === "Yes" ? `${n} says yes to ketchup on eggs.` : `${n} says no to ketchup on eggs.`,
+    "Q7 · Brownie debate": (n, a) => `${n} prefers ${a.toLowerCase()} in a brownie.`,
+    "Q8 · Cold spaghetti": (n, a) => a.startsWith("Yes") ? `${n} says cold spaghetti is delicious.` : `${n} says cold spaghetti ruins it.`,
+    "Q9 · Friends debate": (n, a) => `${n} says the true star of Friends is ${a}.`,
+    "Q10 · AI thank-you notes": (n, a) => a.startsWith("Yes") ? `${n} thinks AI thank-you notes are fine.` : `${n} thinks AI thank-you notes are too impersonal.`,
+    "Q11 · Stranger Things": (n, a) => a.startsWith("Yes") ? `${n} thinks Stranger Things is overrated.` : `${n} thinks Stranger Things is great.`,
+    "Q12 · Laundry debate": (n, a) => `${n} likes to ${a.toLowerCase()} when doing laundry.`,
+    "Q13 · Tea debate": (n, a) => `${n} puts milk in ${a.toLowerCase()} the tea.`,
+    "Q14 · Comic Sans": (n, a) => `${n} thinks Comic Sans is ${a.toLowerCase()}.`,
+    "Q15 · Cat or dog": (n, a) => `${n} is a ${a.toLowerCase()} person.`,
+    "Q16 · Clown or goat": (n, a) => a === "Clown follows me" ? `${n} would rather always have a clown following them.` : `${n} would rather laugh like a goat forever.`,
+    "Q17 · Rhymes or riddles": (n, a) => `${n} would rather talk in ${a.toLowerCase()}.`,
+    "Q18 · Pancakes or pudding": (n, a) => `${n} would rather ${a.toLowerCase()}.`,
+    "Q19 · Burp or fart": (n, a) => `${n} would rather ${a.toLowerCase()}.`,
+    "Q20 · Noodle hair": (n, a) => `${n} would rather have ${a.toLowerCase()}.`,
   };
 </script>
 <style>
