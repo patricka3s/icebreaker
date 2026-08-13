@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Speed Match</title>
+<title>Icebreaker</title>
 <script>
   /* ============================================================
      CONFIG — edit these before deploying
      ============================================================ */
-  const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwbsmfOpMcKAv4FMsuDupCPBmzg4OO4YZMFbCmllBE1C9r7bcEYW7GY_pr6rFUFgf5n1A/exec"; // ends in /exec
-  const SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1xbrrEBqlwxQCOa5ypbKtCd8q1w92kZxkOIkkKUGqqgg/edit?usp=sharing";       // for the end screen
-  const QUESTION_SECONDS = 20; // seconds per question
+  const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbwbsmfOpMcKAv4FMsuDupCPBmzg4OO4YZMFbCmllBE1C9r7bcEYW7GY_pr6rFUFgf5n1A/exec";
+  const SHEET_VIEW_URL = "https://docs.google.com/spreadsheets/d/1xbrrEBqlwxQCOa5ypbKtCd8q1w92kZxkOIkkKUGqqgg/edit?usp=sharing";
+  const TEXT_SECONDS = 20;   // seconds for open-text interest questions
+  const DEBATE_SECONDS = 7;  // seconds for tap-to-choose debate questions
 </script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -87,18 +88,18 @@
 
     <!-- START SCREEN -->
     <div id="screen-start">
-      <div class="eyebrow">SPEED MATCH</div>
-      <h1>Rapid-fire icebreaker</h1>
-      <p class="sub">10 questions, 20 seconds each — half get-to-know-you, half ridiculous debates. Type your first name, then answer as each prompt appears.</p>
+      <div class="eyebrow">ICEBREAKER</div>
+      <h1>No Wrong Answers</h1>
+      <p class="sub">The poll includes 5 get-to-know-you questions with 20 seconds to answer each. Then you'll get 15 debate questions, with 7 seconds to answer each. Type your name and wait for the group to be ready.</p>
       <input type="text" id="name-input" placeholder="Your name" autofocus />
-      <button class="btn" id="btn-start" disabled>Don't Touch This Button!</button>
+      <button class="btn" id="btn-start" disabled>Don't Touch This Button Yet!</button>
       <p class="footnote">Tap start at the same moment as your group for a synced countdown.</p>
     </div>
 
     <!-- QUESTION SCREEN -->
     <div id="screen-question" class="hidden">
       <div class="eyebrow-row">
-        <span id="q-index">QUESTION 1 / 10</span>
+        <span id="q-index">QUESTION 1 / 20</span>
         <span id="q-label"></span>
       </div>
       <div class="timer-ring">
@@ -120,7 +121,7 @@
     <!-- END SCREEN -->
     <div id="screen-end" class="hidden">
       <div class="eyebrow">TIME'S UP</div>
-      <h1>That's all 10.</h1>
+      <h1>That's all 20.</h1>
       <p class="sub">Answers are already in the sheet. Duplicate answers in the same column are your "should connect" pairs.</p>
       <a class="sheet-link" id="link-end" target="_blank" rel="noopener">Open the responses sheet</a>
       <a class="sheet-link" href="results.html" target="_blank" rel="noopener">View live connections graph</a>
@@ -137,11 +138,21 @@
     { label: "Q3 · Hidden skill", type: "text", prompt: "Name a skill you have that nobody on this team knows about." },
     { label: "Q4 · Curious",      type: "text", prompt: "Name something you're currently curious about or trying to learn." },
     { label: "Q5 · Next trip",    type: "text", prompt: "Name a place you'd want to travel to next." },
-    { label: "Q6 · Hot dog debate",  type: "choice", prompt: "Is a hot dog a sandwich?", options: ["A sandwich", "Not a sandwich"] },
-    { label: "Q7 · Cereal debate",   type: "choice", prompt: "Is cereal a soup?", options: ["Yes, it's soup", "No way"] },
-    { label: "Q8 · Pizza debate",    type: "choice", prompt: "Pineapple on pizza?", options: ["Delicious", "Disgusting"] },
-    { label: "Q9 · TP debate",       type: "choice", prompt: "Toilet paper: over or under?", options: ["Over", "Under"] },
-    { label: "Q10 · Duck debate",    type: "choice", prompt: "Fight one horse-sized duck, or 100 duck-sized horses?", options: ["1 horse-sized duck", "100 duck-sized horses"] },
+    { label: "Q6 · Ketchup on eggs",   type: "choice", prompt: "Should ketchup go on eggs?", options: ["Yes", "No"] },
+    { label: "Q7 · Brownie debate",    type: "choice", prompt: "Brownies: edges or gooey middle?", options: ["Edges", "Gooey middle"] },
+    { label: "Q8 · Cold spaghetti",    type: "choice", prompt: "Can spaghetti be eaten cold and still be delicious?", options: ["Yes, delicious", "No, ruins it"] },
+    { label: "Q9 · Friends debate",    type: "choice", prompt: "Who's the true star of Friends?", options: ["Joey", "Chandler"] },
+    { label: "Q10 · AI thank-you notes", type: "choice", prompt: "Is it ok to use AI to write thank you notes?", options: ["Yes, totally fine", "No, too impersonal"] },
+    { label: "Q11 · Stranger Things",  type: "choice", prompt: "Is Stranger Things overrated?", options: ["Yes, overrated", "No, it's great"] },
+    { label: "Q12 · Laundry debate",   type: "choice", prompt: "Separate laundry or toss it all in together?", options: ["Separate it", "Toss it all in"] },
+    { label: "Q13 · Tea debate",       type: "choice", prompt: "Milk goes in before or after tea?", options: ["Before", "After"] },
+    { label: "Q14 · Comic Sans",       type: "choice", prompt: "Comic Sans: fun or crime?", options: ["Fun", "A crime"] },
+    { label: "Q15 · Cat or dog",       type: "choice", prompt: "Cat or dog?", options: ["Cat", "Dog"] },
+    { label: "Q16 · Clown or goat",    type: "choice", prompt: "Would you rather always have a clown following you, or laugh like a goat?", options: ["Clown follows me", "Laugh like a goat"] },
+    { label: "Q17 · Rhymes or riddles", type: "choice", prompt: "Would you rather talk only in rhymes or only in riddles?", options: ["Only rhymes", "Only riddles"] },
+    { label: "Q18 · Pancakes or pudding", type: "choice", prompt: "Would you rather sleep on pancakes or bathe in pudding?", options: ["Sleep on pancakes", "Bathe in pudding"] },
+    { label: "Q19 · Burp or fart",     type: "choice", prompt: "Would you rather burp bubbles or fart confetti?", options: ["Burp bubbles", "Fart confetti"] },
+    { label: "Q20 · Noodle hair",      type: "choice", prompt: "Would you rather have hair made of noodles or fingers made of hot dogs?", options: ["Noodle hair", "Hot dog fingers"] },
   ];
 
   const CIRCUMFERENCE = 2 * Math.PI * 48; // matches r=48 in the SVG ring
@@ -229,7 +240,8 @@
       answerInput.focus();
     }
 
-    let secondsLeft = QUESTION_SECONDS;
+    const dur = q.type === "choice" ? DEBATE_SECONDS : TEXT_SECONDS;
+    let secondsLeft = dur;
     const ring = document.getElementById("ring-progress");
     const numEl = document.getElementById("timer-num");
     ring.style.strokeDasharray = CIRCUMFERENCE;
@@ -241,9 +253,9 @@
     timerInterval = setInterval(() => {
       secondsLeft -= 1;
       numEl.textContent = Math.max(secondsLeft, 0);
-      const fraction = Math.max(secondsLeft, 0) / QUESTION_SECONDS;
+      const fraction = Math.max(secondsLeft, 0) / dur;
       ring.style.strokeDashoffset = CIRCUMFERENCE * (1 - fraction);
-      if (secondsLeft <= 8) numEl.style.color = "#F0665A";
+      if (secondsLeft <= Math.min(8, Math.ceil(dur / 2))) numEl.style.color = "#F0665A";
       if (secondsLeft <= 0) {
         clearInterval(timerInterval);
         if (!submittedThisQuestion) submitAnswer(QUESTIONS[index].label, answerInput.value);
