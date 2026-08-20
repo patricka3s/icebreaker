@@ -79,6 +79,7 @@
   .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
   svg { width: 100%; height: auto; background: #122845; border: 1px solid #1E3A5F; border-radius: 14px; }
   .empty { color: #5B6478; font-size: 13px; padding: 30px 0; text-align: center; }
+  .hidden { display: none !important; }
   .feed-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin: 28px 0 10px; }
   .feed { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; scroll-behavior: smooth; }
   .feed-item {
@@ -125,7 +126,7 @@
     <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:2px;background:#5B6478;display:inline-block"></span>same answer</span>
     <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:0;border-top:2px dashed #5B6478;display:inline-block"></span>shared keyword only</span>
     <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-      <input type="checkbox" id="pause-toggle" />
+      <input type="checkbox" id="pause-toggle" checked />
       Pause live updates
     </label>
     <label style="margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer">
@@ -175,7 +176,7 @@
   const STOPWORDS = new Set(["the","a","an","and","of","to","in","on","with","your","you","can","do","my","every","for"]);
   let jsonpCounter = 0;
   let lastRows = [];
-  let paused = false;
+  let paused = true;
   const debateLabels = QUESTION_LABELS.slice(5);
   let debateFilterSet = new Set(debateLabels); // all selected = no filter applied
 
@@ -511,26 +512,33 @@
     if (paused) {
       statusEl.textContent = `Paused — showing ${lastRows.length} answers as of ${new Date().toLocaleTimeString()}`;
       statusEl.className = "status";
+    } else {
+      poll(true);
     }
   });
 
-  async function poll() {
-    if (paused) return;
+  async function poll(force) {
+    if (paused && !force) return;
     const statusEl = document.getElementById("status");
     try {
       const data = await fetchJsonp();
       lastRows = data.rows || [];
       render(lastRows);
-      statusEl.textContent = `Live — ${lastRows.length} answers — updated ${new Date().toLocaleTimeString()}`;
-      statusEl.className = "status live";
+      if (paused) {
+        statusEl.textContent = `Paused — showing ${lastRows.length} answers as of ${new Date().toLocaleTimeString()}`;
+        statusEl.className = "status";
+      } else {
+        statusEl.textContent = `Live — ${lastRows.length} answers — updated ${new Date().toLocaleTimeString()}`;
+        statusEl.className = "status live";
+      }
     } catch (err) {
       statusEl.textContent = "Couldn't reach the sheet — check SHEET_WEBHOOK_URL in results.html";
       statusEl.className = "status";
     }
   }
 
-  poll();
-  setInterval(poll, POLL_MS);
+  poll(true);
+  setInterval(() => poll(false), POLL_MS);
 </script>
 </body>
 </html>
