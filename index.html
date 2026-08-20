@@ -210,6 +210,7 @@
     document.getElementById("q-index").textContent = `QUESTION ${index + 1} / ${QUESTIONS.length}`;
     document.getElementById("q-label").textContent = q.label;
     document.getElementById("q-prompt").textContent = q.prompt;
+    answerInput.value = "";
 
     if (q.type === "choice") {
       answerInput.classList.add("hidden");
@@ -234,7 +235,6 @@
       choiceRow.classList.add("hidden");
       answerInput.classList.remove("hidden");
       submitBtn.classList.remove("hidden");
-      answerInput.value = "";
       answerInput.disabled = false;
       submitBtn.disabled = false;
       answerInput.focus();
