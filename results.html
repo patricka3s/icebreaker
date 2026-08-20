@@ -86,6 +86,20 @@
     border-radius: 6px; padding: 8px 12px;
   }
   .feed-item .name { color: #3B82D8; font-weight: 500; }
+  .filter-select {
+    background: #0A1A33; color: #E8ECF4; border: 1px solid #1E3A5F; border-radius: 6px;
+    padding: 4px 8px; font-size: 11.5px; font-family: 'IBM Plex Mono', monospace;
+  }
+  .variety-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; margin: 28px 0 14px; }
+  .variety-panels { display: flex; flex-direction: column; gap: 22px; background: #122845; border: 1px solid #1E3A5F; border-radius: 14px; padding: 20px 24px; }
+  .variety-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .variety-head span:first-child { font-size: 13.5px; font-weight: 500; color: #E8ECF4; }
+  .variety-head span:last-child { font-size: 11.5px; color: #5B6478; }
+  .variety-row { display: flex; align-items: center; gap: 8px; padding: 2.5px 0; }
+  .variety-label { width: 200px; flex-shrink: 0; font-size: 12px; color: #8891A7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .variety-bar-track { flex: 1; background: #0A1A33; border-radius: 3px; height: 13px; }
+  .variety-bar-fill { background: #3B82D8; height: 100%; border-radius: 3px; min-width: 13px; }
+  .variety-count { width: 18px; flex-shrink: 0; font-size: 11px; color: #5B6478; text-align: right; }
 </style>
 </head>
 <body>
@@ -95,6 +109,10 @@
   <div class="style-row">
     <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:2px;background:#5B6478;display:inline-block"></span>same answer</span>
     <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:0;border-top:2px dashed #5B6478;display:inline-block"></span>shared keyword only</span>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="pause-toggle" />
+      Pause live updates
+    </label>
     <label style="margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer">
       <input type="checkbox" id="weak-toggle" />
       Show loose matches
@@ -114,13 +132,19 @@
     <div class="panel" id="panel-debates">
       <div class="panel-head">
         <h2>Debates</h2>
-        <button class="expand-btn" data-panel="panel-debates">Expand</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <select class="filter-select" id="debate-filter"></select>
+          <button class="expand-btn" data-panel="panel-debates">Expand</button>
+        </div>
       </div>
       <div class="legend" id="legend-debates"></div>
       <svg id="graph-debates" viewBox="0 0 640 520"></svg>
       <p class="empty" id="empty-debates" style="display:none">No responses yet.</p>
     </div>
   </div>
+
+  <div class="variety-title">Answer variety — interests</div>
+  <div class="variety-panels" id="variety"></div>
 
   <div class="feed-title">Response feed</div>
   <div class="feed" id="feed"></div>
@@ -132,6 +156,17 @@
   const OTHER = "#5B6478";
   const STOPWORDS = new Set(["the","a","an","and","of","to","in","on","with","your","you","can","do","my","every","for"]);
   let jsonpCounter = 0;
+  let lastRows = [];
+  let paused = false;
+  let debateFilter = "all";
+
+  const debateSelect = document.getElementById("debate-filter");
+  debateSelect.innerHTML = `<option value="all">All debates</option>` +
+    QUESTION_LABELS.slice(5).map((q) => `<option value="${q}">${q.split(" · ")[1]}</option>`).join("");
+  debateSelect.addEventListener("change", (e) => {
+    debateFilter = e.target.value;
+    render(lastRows);
+  });
 
   const GROUPS = {
     interests: { questions: QUESTION_LABELS.slice(0, 5), svg: "graph-interests", legend: "legend-interests", empty: "empty-interests", sim: null },
@@ -174,7 +209,7 @@
 
   function renderGroup(byPerson, groupKey) {
     const g = GROUPS[groupKey];
-    const questions = g.questions;
+    const questions = groupKey === "debates" && debateFilter !== "all" ? [debateFilter] : g.questions;
     const names = Object.keys(byPerson).filter((n) => questions.some((q) => byPerson[n][q]));
     document.getElementById(g.empty).style.display = names.length ? "none" : "block";
     if (!names.length) {
@@ -315,6 +350,35 @@
     });
   }
 
+  function renderVariety(rows) {
+    const container = document.getElementById("variety");
+    const interestLabels = QUESTION_LABELS.slice(0, 5);
+    container.innerHTML = interestLabels.map((q) => {
+      const groups = {};
+      rows.filter((r) => r.question === q).forEach((r) => {
+        const key = normalize(r.answer);
+        if (!key) return;
+        groups[key] = groups[key] || { label: r.answer, count: 0 };
+        groups[key].count++;
+      });
+      const sorted = Object.values(groups).sort((a, b) => b.count - a.count);
+      if (!sorted.length) return "";
+      const max = sorted[0].count;
+      const rowsHtml = sorted.map((s) => {
+        const pct = Math.round((s.count / max) * 100);
+        return `<div class="variety-row">
+          <span class="variety-label">${escapeHtml(s.label)}</span>
+          <div class="variety-bar-track"><div class="variety-bar-fill" style="width:${pct}%"></div></div>
+          <span class="variety-count">${s.count}</span>
+        </div>`;
+      }).join("");
+      return `<div>
+        <div class="variety-head"><span>${q.split(" · ")[1]}</span><span>${sorted.length} unique answers</span></div>
+        ${rowsHtml}
+      </div>`;
+    }).join("");
+  }
+
   function render(rows) {
     const byPerson = {};
     rows.forEach((r) => {
@@ -322,6 +386,7 @@
       byPerson[r.name][r.question] = r.answer;
     });
     renderFeed(rows);
+    renderVariety(rows);
     renderGroup(byPerson, "interests");
     renderGroup(byPerson, "debates");
   }
@@ -357,12 +422,23 @@
   document.addEventListener("fullscreenchange", syncExpandButtons);
   document.addEventListener("webkitfullscreenchange", syncExpandButtons);
 
+  document.getElementById("pause-toggle").addEventListener("change", (e) => {
+    paused = e.target.checked;
+    const statusEl = document.getElementById("status");
+    if (paused) {
+      statusEl.textContent = `Paused — showing ${lastRows.length} answers as of ${new Date().toLocaleTimeString()}`;
+      statusEl.className = "status";
+    }
+  });
+
   async function poll() {
+    if (paused) return;
     const statusEl = document.getElementById("status");
     try {
       const data = await fetchJsonp();
-      render(data.rows || []);
-      statusEl.textContent = `Live — ${data.rows.length} answers — updated ${new Date().toLocaleTimeString()}`;
+      lastRows = data.rows || [];
+      render(lastRows);
+      statusEl.textContent = `Live — ${lastRows.length} answers — updated ${new Date().toLocaleTimeString()}`;
       statusEl.className = "status live";
     } catch (err) {
       statusEl.textContent = "Couldn't reach the sheet — check SHEET_WEBHOOK_URL in results.html";
