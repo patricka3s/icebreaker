@@ -316,6 +316,16 @@
       `${d.target}: "${d.infoB.answer}" (${d.infoB.question.split(" · ")[1]})\n` +
       `shared word: ${d.label}`
     );
+    const weakLabel = weakLinkG.selectAll("text").data(weak).join("text")
+      .attr("font-size", "9.5px").attr("font-family", "IBM Plex Mono, monospace")
+      .attr("fill", "#8891A7").attr("text-anchor", "middle")
+      .attr("paint-order", "stroke").attr("stroke", "#122845").attr("stroke-width", 4).attr("stroke-linejoin", "round")
+      .text((d) => d.label);
+    weakLabel.append("title").text((d) =>
+      `${d.source}: "${d.infoA.answer}" (${d.infoA.question.split(" · ")[1]})\n` +
+      `${d.target}: "${d.infoB.answer}" (${d.infoB.question.split(" · ")[1]})\n` +
+      `shared word: ${d.label}`
+    );
 
     const node = svg.append("g").selectAll("g").data(nodes).join("g");
     node.append("circle")
@@ -361,6 +371,8 @@
           .attr("x2", (d) => d.target.x).attr("y2", (d) => d.target.y);
       weakLink.attr("x1", (d) => d.source.x).attr("y1", (d) => d.source.y)
               .attr("x2", (d) => d.target.x).attr("y2", (d) => d.target.y);
+      weakLabel.attr("x", (d) => (d.source.x + d.target.x) / 2)
+               .attr("y", (d) => (d.source.y + d.target.y) / 2);
       node.attr("transform", (d) => `translate(${d.x},${d.y})`);
     });
   }
