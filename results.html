@@ -263,10 +263,117 @@
     feedEl.scrollTop = 0;
   }
 
-  function renderGroup(byPerson, groupKey) {
-    const g = GROUPS[groupKey];
+  function renderDebateHubs(byPerson) {
+    const g = GROUPS.debates;
     const activeDebateSet = debateFilterSet.size ? debateFilterSet : new Set(debateLabels);
-    const questions = groupKey === "debates" ? g.questions.filter((q) => activeDebateSet.has(q)) : g.questions;
+    const questions = g.questions.filter((q) => activeDebateSet.has(q));
+    const names = Object.keys(byPerson).filter((n) => questions.some((q) => byPerson[n][q]));
+    document.getElementById(g.empty).style.display = names.length ? "none" : "block";
+    if (!names.length) {
+      d3.select("#" + g.svg).selectAll("*").remove();
+      document.getElementById(g.legend).innerHTML = "";
+      return;
+    }
+
+    // One bubble per (question, answer) instead of a person-to-person clique —
+    // avoids O(n²) edges when 10+ people share the same answer.
+    const hubs = [];
+    const hubIndex = {};
+    questions.forEach((q) => {
+      const counts = {};
+      names.forEach((n) => {
+        const raw = byPerson[n][q];
+        if (raw) counts[raw] = (counts[raw] || 0) + 1;
+      });
+      Object.entries(counts).forEach(([answer, count]) => {
+        const id = q + "__" + answer;
+        const hub = { id, type: "hub", question: q, answer, count };
+        hubs.push(hub);
+        hubIndex[id] = hub;
+      });
+    });
+
+    const ranked = [...hubs].sort((a, b) => b.count - a.count);
+    ranked.slice(0, CLUSTER_COLORS.length).forEach((h, i) => { h.color = CLUSTER_COLORS[i]; });
+    hubs.forEach((h) => { if (!h.color) h.color = OTHER; });
+
+    const personNodes = names.map((n) => ({ id: n, type: "person" }));
+    const nodes = [...hubs, ...personNodes];
+
+    const links = [];
+    names.forEach((n) => {
+      questions.forEach((q) => {
+        const raw = byPerson[n][q];
+        if (!raw) return;
+        const id = q + "__" + raw;
+        links.push({ source: n, target: id, color: hubIndex[id].color });
+      });
+    });
+
+    document.getElementById(g.legend).innerHTML =
+      `<span style="color:#5B6478">bubble size = number of people who gave that answer</span>`;
+
+    const svg = d3.select("#" + g.svg);
+    svg.selectAll("*").remove();
+    const W = 640, H = 520;
+    const hubRadius = (d) => 13 + Math.min(d.count, 15) * 2.1;
+
+    const link = svg.append("g").selectAll("line").data(links).join("line")
+      .attr("stroke", (d) => d.color).attr("stroke-width", 1).attr("opacity", 0.3);
+
+    const node = svg.append("g").selectAll("g").data(nodes).join("g");
+
+    const hubSel = node.filter((d) => d.type === "hub");
+    hubSel.append("circle")
+      .attr("r", hubRadius).attr("fill", (d) => d.color).attr("opacity", 0.88)
+      .attr("stroke", "#122845").attr("stroke-width", 2);
+    hubSel.append("title").text((d) => `${d.question.split(" · ")[1]}: ${d.answer} — ${d.count} ${d.count === 1 ? "person" : "people"}`);
+    hubSel.append("text").attr("text-anchor", "middle")
+      .attr("dy", (d) => -hubRadius(d) - 8)
+      .attr("fill", "#E8ECF4").attr("font-size", "10.5px").attr("font-weight", "600")
+      .attr("font-family", "IBM Plex Mono, monospace")
+      .attr("paint-order", "stroke").attr("stroke", "#122845").attr("stroke-width", 4).attr("stroke-linejoin", "round")
+      .text((d) => (questions.length > 1 ? `${d.question.split(" · ")[1]}: ${d.answer}` : d.answer) + ` (${d.count})`);
+
+    const personSel = node.filter((d) => d.type === "person");
+    personSel.append("circle")
+      .attr("r", 6).attr("fill", "#8891A7").attr("stroke", "#122845").attr("stroke-width", 1);
+    personSel.append("title").text((d) => {
+      const lines = questions.filter((q) => byPerson[d.id][q]).map((q) => `${q.split(" · ")[1]}: ${byPerson[d.id][q]}`);
+      return [d.id, ...lines].join("\n");
+    });
+    personSel.append("text").attr("text-anchor", "middle").attr("dy", -10)
+      .attr("fill", "#5B6478").attr("font-size", "9px").attr("font-family", "IBM Plex Mono, monospace")
+      .text((d) => d.id);
+
+    if (g.sim) g.sim.stop();
+    g.sim = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id((d) => d.id).distance(75).strength(0.6))
+      .force("charge", d3.forceManyBody().strength((d) => d.type === "hub" ? -420 : -60))
+      .force("center", d3.forceCenter(W / 2, H / 2))
+      .force("x", d3.forceX(W / 2).strength(0.03))
+      .force("y", d3.forceY(H / 2).strength(0.03))
+      .force("collide", d3.forceCollide((d) => d.type === "hub" ? hubRadius(d) + 14 : 10));
+
+    const PAD = 44;
+    nodes.forEach((n) => { n.x = W / 2 + (Math.random() - 0.5) * 120; n.y = H / 2 + (Math.random() - 0.5) * 120; });
+
+    g.sim.on("tick", () => {
+      nodes.forEach((n) => {
+        n.x = Math.max(PAD, Math.min(W - PAD, n.x));
+        n.y = Math.max(PAD, Math.min(H - PAD, n.y));
+      });
+      link.attr("x1", (d) => d.source.x).attr("y1", (d) => d.source.y)
+          .attr("x2", (d) => d.target.x).attr("y2", (d) => d.target.y);
+      node.attr("transform", (d) => `translate(${d.x},${d.y})`);
+    });
+  }
+
+  function renderGroup(byPerson, groupKey) {
+    if (groupKey === "debates") return renderDebateHubs(byPerson);
+
+    const g = GROUPS[groupKey];
+    const questions = g.questions;
     const names = Object.keys(byPerson).filter((n) => questions.some((q) => byPerson[n][q]));
     document.getElementById(g.empty).style.display = names.length ? "none" : "block";
     if (!names.length) {
