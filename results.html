@@ -292,12 +292,21 @@
 
     if (g.sim) g.sim.stop();
     g.sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink([...strong, ...weak]).id((d) => d.id).distance((d) => strong.includes(d) ? 65 : 110).strength(0.4))
-      .force("charge", d3.forceManyBody().strength(-200))
+      .force("link", d3.forceLink([...strong, ...weak]).id((d) => d.id).distance((d) => strong.includes(d) ? 85 : 130).strength(0.5))
+      .force("charge", d3.forceManyBody().strength(-260))
       .force("center", d3.forceCenter(W / 2, H / 2))
-      .force("collide", d3.forceCollide(28));
+      .force("x", d3.forceX(W / 2).strength(0.04))
+      .force("y", d3.forceY(H / 2).strength(0.04))
+      .force("collide", d3.forceCollide((d) => 12 + Math.min(degree[d.id] || 0, 6) * 2));
+
+    const PAD = 40;
+    nodes.forEach((n) => { n.x = W / 2 + (Math.random() - 0.5) * 100; n.y = H / 2 + (Math.random() - 0.5) * 100; });
 
     g.sim.on("tick", () => {
+      nodes.forEach((n) => {
+        n.x = Math.max(PAD, Math.min(W - PAD, n.x));
+        n.y = Math.max(PAD, Math.min(H - PAD, n.y));
+      });
       link.attr("x1", (d) => d.source.x).attr("y1", (d) => d.source.y)
           .attr("x2", (d) => d.target.x).attr("y2", (d) => d.target.y);
       weakLink.attr("x1", (d) => d.source.x).attr("y1", (d) => d.source.y)
